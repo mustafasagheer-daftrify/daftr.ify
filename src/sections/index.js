@@ -1,0 +1,12 @@
+export { default as Nav } from './Nav';
+export { default as Hero } from './Hero';
+export { default as Capabilities } from './Capabilities';
+export { default as Transformation } from './Transformation';
+export { default as Work } from './Work';
+export { default as Process } from './Process';
+export { default as About } from './About';
+export { default as FAQ } from './FAQ';
+export { default as FinalCTA } from './FinalCTA';
+export { default as Footer } from './Footer';
+export { default as Marquee } from './Marquee';
+export { default as HumanReview } from './HumanReview';
