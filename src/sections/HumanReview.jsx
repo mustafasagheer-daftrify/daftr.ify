@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Check, AlertTriangle, FileText, Loader2, Eye, Edit3, ArrowRight } from 'lucide-react';
+import { Check, AlertTriangle, FileText, Loader2, Edit3, Search, Minus } from 'lucide-react';
 import { Section, SectionHead } from '../components/Section';
 import { Redline, Annotation, StatusBadge, PhaseIndicator, DocumentProgress } from '../motion/primitives';
-import { useReducedMotion, useScrollScene } from '../motion';
+import { useReducedMotion, useScrollScene, useDocumentState, useParallax } from '../motion';
 
 const EASE = [0.22, 1, 0.36, 1];
 
@@ -21,6 +21,12 @@ const REVIEW_STEPS = [
     severity: 'HIGH',
     annotation: 'Amounts use mixed currency formats (£1,200 vs 1200 GBP). Embassy requires standardized format per UKVI guidance.',
     correction: 'Standardized all amounts to GBP 1,200.00 format. Added currency legend to document index.',
+    documentLines: [
+      { text: 'Financial evidence: bank statements', status: 'issue', issueText: 'Mixed currency formats' },
+      { text: 'Accommodation: confirmed booking', status: 'pending' },
+      { text: 'Cover letter: drafted', status: 'pending' },
+      { text: 'Photographs: spec format', status: 'pending' },
+    ],
   },
   {
     id: 'review',
@@ -35,6 +41,12 @@ const REVIEW_STEPS = [
     severity: 'MEDIUM',
     annotation: 'Missing "Entry Clearance Officer" address. Visa type reference (Student Route) not explicitly stated in opening paragraph.',
     correction: 'Added formal address block. Explicitly referenced Student Route visa. Aligned tone with UKVI communication standards.',
+    documentLines: [
+      { text: 'Financial evidence: bank statements', status: 'resolved', correction: 'Standardized to GBP 1,200.00' },
+      { text: 'Cover letter: drafted', status: 'issue', issueText: 'Missing formal address block' },
+      { text: 'Accommodation: confirmed booking', status: 'pending' },
+      { text: 'Photographs: spec format', status: 'pending' },
+    ],
   },
   {
     id: 'verified',
@@ -49,133 +61,94 @@ const REVIEW_STEPS = [
     severity: 'RESOLVED',
     annotation: 'Financial evidence formatting standardized. Cover letter address and visa reference corrected. Cross-references validated. Index updated.',
     correction: 'Final consistency pass complete. No outstanding issues. Generated submission-ready PDF package.',
+    documentLines: [
+      { text: 'Financial evidence: bank statements', status: 'resolved' },
+      { text: 'Cover letter: drafted', status: 'resolved', correction: 'Formal address added; visa type referenced' },
+      { text: 'Accommodation: confirmed booking', status: 'resolved' },
+      { text: 'Photographs: spec format', status: 'resolved' },
+    ],
   },
 ];
 
-function ReviewCard({ step, index, isActive, isCompleted, reduced, onAction }) {
-  const Icon = step.icon;
+function DocumentLine({ line, reduced, accent }) {
+  const statusColors = {
+    issue: { dot: 'var(--warning)', bg: 'rgba(245,158,11,0.08)', text: 'var(--warning)' },
+    resolved: { dot: 'var(--green)', bg: 'rgba(52,211,153,0.08)', text: 'var(--green)' },
+    pending: { dot: 'var(--text-muted)', bg: 'transparent', text: 'var(--text-dim)' },
+    resolvedText: { dot: 'var(--green)', bg: 'rgba(52,211,153,0.08)', text: 'var(--green)' },
+  };
+
+  const c = statusColors[line.status] || statusColors.pending;
 
   return (
-    <motion.article
-      className={`review-card ${isActive ? 'active' : ''} ${isCompleted ? 'completed' : ''}`}
-      initial={reduced ? false : { opacity: 0, y: 30 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: reduced ? 0.01 : 0.6, delay: reduced ? 0 : index * 0.12, ease: EASE }}
-      style={{
-        '--step-color': step.color,
-        '--step-bg': step.bg,
-        '--step-border': step.border,
-      }}
+    <motion.div
+      className="review-doc__line"
+      initial={reduced ? false : { opacity: 0, x: -20 }}
+      animate={{ opacity: 1, x: 0 }}
+      transition={{ duration: reduced ? 0.01 : 0.35, ease: EASE }}
+      style={{ '--line-color': c.dot, '--line-bg': c.bg, '--line-text': c.text }}
     >
-      <div className="review-card__header">
-        <div className="review-card__phase">
-          <span className="review-card__phase-label">{step.label}</span>
-          <span className="review-card__phase-subtitle">{step.subtitle}</span>
-        </div>
-        <StatusBadge
-          status={isCompleted ? 'verified' : isActive ? 'reviewed' : 'raw'}
-          style={{ '--badge-color': step.color }}
-        />
-      </div>
-
-      <div className="review-card__content">
-        <div className="review-card__issue-block">
-          <div className="review-card__issue-meta">
-            <span className="review-card__location">{step.location}</span>
-            <span className="review-card__severity" style={{ background: step.severity === 'HIGH' ? 'rgba(239,68,68,0.15)' : step.severity === 'MEDIUM' ? 'rgba(245,158,11,0.15)' : 'rgba(52,211,153,0.15)' }}>
-              {step.severity}
-            </span>
-          </div>
-          <p className="review-card__issue">{step.issue}</p>
-        </div>
-
-        <div className="review-card__annotation-block">
-          <Annotation
-            active={isActive || isCompleted}
-            position={{ top: 'auto', left: 'auto' }}
-            reduced={reduced}
-          >
-            <div className="annotation-content">
-              <div className="annotation-content__header">
-                <Icon size={12} style={{ color: step.color }} />
-                <span>Human annotation</span>
-              </div>
-              <p>{step.annotation}</p>
-            </div>
-          </Annotation>
-        </div>
-
-        {isCompleted && (
-          <motion.div
-            className="review-card__resolution"
-            initial={reduced ? false : { opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: 'auto' }}
-            transition={{ duration: reduced ? 0.01 : 0.5, delay: reduced ? 0 : 0.3, ease: EASE }}
-          >
-            <div className="review-card__resolution-header">
-              <Check size={12} style={{ color: 'var(--green)' }} />
-              <span>Correction applied</span>
-            </div>
-            <p>{step.correction}</p>
-          </motion.div>
-        )}
-
-        {isActive && !isCompleted && (
-          <motion.div
-            className="review-card__action"
-            initial={reduced ? false : { opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: reduced ? 0.01 : 0.4, delay: reduced ? 0 : 0.2, ease: EASE }}
-          >
-            <button
-              onClick={() => onAction?.(step.id)}
-              className="review-action-btn"
-              style={{ borderColor: step.color, color: step.color }}
-            >
-              <Eye size={13} /> Review & resolve
-            </button>
-          </motion.div>
-        )}
-      </div>
-
-      <div className="review-card__connector" aria-hidden="true">
-        <span className="review-card__connector-line" style={{ background: isCompleted ? step.color : 'var(--border)' }} />
-        <span className="review-card__connector-dot" style={{ background: isCompleted ? step.color : isActive ? step.color : 'var(--border)', borderColor: isCompleted ? step.color : isActive ? step.color : 'var(--border)' }} />
-      </div>
-    </motion.article>
+      <span className="review-doc__line-dot" />
+      <span className="review-doc__line-text">{line.text}</span>
+      {line.issueText && (
+        <motion.span
+          className="review-doc__issue-badge"
+          initial={reduced ? false : { opacity: 0, scale: 0.5 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: reduced ? 0.01 : 0.3, delay: reduced ? 0 : 0.15, ease: EASE }}
+        >
+          <Search size={9} /> {line.issueText}
+        </motion.span>
+      )}
+      {line.correction && (
+        <motion.span
+          className="review-doc__correction-badge"
+          initial={reduced ? false : { opacity: 0, scale: 0.5 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: reduced ? 0.01 : 0.3, delay: reduced ? 0 : 0.2, ease: EASE }}
+        >
+          <Edit3 size={9} /> {line.correction}
+        </motion.span>
+      )}
+    </motion.div>
   );
 }
 
-function ReviewDocumentPreview({ activeStep, reduced }) {
+function ReviewDocument({ activeStep, reduced }) {
+  const step = REVIEW_STEPS.find(s => s.id === activeStep);
   const steps = REVIEW_STEPS;
   const activeIndex = steps.findIndex(s => s.id === activeStep);
 
   return (
-    <div className="review-document-preview" aria-label="Document preview">
+    <div className="review-document" aria-label="Document under review">
       <div className="review-doc__header">
-        <div className="review-doc__dots">
-          <span /><span /><span />
+        <div className="review-doc__meta">
+          <span className="review-doc__filename">VISA_APPLICATION_PACK.pdf</span>
+          <StatusBadge status={activeStep === 'verified' ? 'verified' : activeStep === 'review' ? 'reviewed' : 'raw'} style={{ '--badge-color': step.color }} />
         </div>
-        <span className="review-doc__title">VISA_APPLICATION_PACK.pdf</span>
-        <StatusBadge status={activeStep === 'verified' ? 'verified' : activeStep === 'review' ? 'reviewed' : 'raw'} />
       </div>
 
       <div className="review-doc__pages">
-        {steps.map((step, i) => (
+        {steps.map((s, i) => (
           <motion.div
-            key={step.id}
+            key={s.id}
             className={`review-doc__page ${i === activeIndex ? 'active' : ''} ${i < activeIndex ? 'completed' : ''}`}
             initial={reduced ? false : { opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: reduced ? 0.01 : 0.4, delay: reduced ? 0 : i * 0.08, ease: EASE }}
-            style={{ '--page-accent': step.color }}
+            style={{ '--page-accent': s.color }}
           >
             <div className="review-doc__page-header">
-              <span className="review-doc__page-label">{step.label}</span>
+              <span className="review-doc__page-label">{s.label}</span>
               <span className="review-doc__page-num">p.{i + 1}</span>
             </div>
             <div className="review-doc__page-content">
-              {step.issue && i === activeIndex && (
+              {s.documentLines.map((line, li) => (
+                <DocumentLine key={`${s.id}-${li}`} line={line} reduced={reduced} accent={step.color} />
+              ))}
+            </div>
+            <div className="review-doc__page-footer">
+              {i === activeIndex && step.issue && (
                 <Redline active={true}>
                   {step.issue}
                 </Redline>
@@ -205,11 +178,38 @@ function ReviewDocumentPreview({ activeStep, reduced }) {
   );
 }
 
+function ReviewStepMarker({ step, index, isActive, isCompleted, reduced, onClick }) {
+  return (
+    <motion.div
+      className={`review-step-marker ${isActive ? 'active' : ''} ${isCompleted ? 'completed' : ''}`}
+      initial={reduced ? false : { opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: reduced ? 0.01 : 0.5, delay: reduced ? 0 : index * 0.1, ease: EASE }}
+      onClick={() => onClick(step.id)}
+      style={{ '--step-color': step.color }}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') onClick(step.id); }}
+    >
+      <div className="review-step-marker__connector">
+        <span className="review-step-marker__line" style={{ background: isCompleted ? step.color : 'var(--border)' }} />
+        <span className="review-step-marker__dot" style={{ background: isCompleted ? step.color : isActive ? step.color : 'var(--border)', borderColor: isCompleted ? step.color : isActive ? step.color : 'var(--border)' }} />
+      </div>
+      <div className="review-step-marker__content">
+        <span className="review-step-marker__label">{step.label}</span>
+        <span className="review-step-marker__subtitle">{step.subtitle}</span>
+        <StatusBadge status={isCompleted ? 'verified' : isActive ? 'reviewed' : 'raw'} style={{ '--badge-color': step.color }} />
+      </div>
+    </motion.div>
+  );
+}
+
 export default function HumanReview() {
   const reduced = useReducedMotion();
   const [activeStep, setActiveStep] = useState('flagged');
   const [completedSteps, setCompletedSteps] = useState(new Set());
-  const [autoAdvance, setAutoAdvance] = useState(true);
+  const { phase } = useDocumentState();
+  const { style: parallaxStyle } = useParallax({ containerRef: { current: null } });
 
   const { ref, getValues } = useScrollScene({
     offset: ['start start', 'end end'],
@@ -230,19 +230,19 @@ export default function HumanReview() {
   };
 
   useEffect(() => {
-    if (!autoAdvance || reduced) return;
+    if (reduced) return;
     const timer = setTimeout(() => {
       if (activeStep !== 'verified' && !completedSteps.has(activeStep)) {
         handleResolve(activeStep);
       }
-    }, 8000);
+    }, 10000);
     return () => clearTimeout(timer);
-  }, [activeStep, completedSteps, autoAdvance, reduced]);
+  }, [activeStep, completedSteps, reduced]);
 
   return (
     <Section ref={ref} id="human-review" className="section--human-review" style={{ transform: y, opacity }}>
       <div className="review-layout">
-        <div className="review-panel">
+        <div className="review-panel" style={{ ...parallaxStyle }}>
           <SectionHead
             kicker="02 / Human in the loop"
             title={<>Automation drafts.<br /><span className="gradient-text">Humans decide.</span></>}
@@ -260,24 +260,22 @@ export default function HumanReview() {
             onPhaseClick={setActiveStep}
           />
 
-          <div className="review-cards" role="list" aria-label="Review steps">
+          <div className="review-steps" role="list" aria-label="Review steps">
             {REVIEW_STEPS.map((step, i) => (
-              <ReviewCard
+              <ReviewStepMarker
                 key={step.id}
                 step={step}
                 index={i}
                 isActive={activeStep === step.id}
                 isCompleted={completedSteps.has(step.id)}
                 reduced={reduced}
-                onAction={handleResolve}
+                onClick={setActiveStep}
               />
             ))}
           </div>
 
           <div className="review-principle">
-            <div className="review-principle__icon">
-              <FileText size={20} />
-            </div>
+            <FileText size={20} />
             <div>
               <strong>No invented metrics. No fake guarantees.</strong>
               <p>This checkpoint exists because document decisions have real consequences. The human reviewer is accountable for what gets submitted.</p>
@@ -286,7 +284,7 @@ export default function HumanReview() {
         </div>
 
         <div className="review-preview-panel">
-          <ReviewDocumentPreview activeStep={activeStep} reduced={reduced} />
+          <ReviewDocument activeStep={activeStep} reduced={reduced} />
         </div>
       </div>
     </Section>

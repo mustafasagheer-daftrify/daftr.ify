@@ -1,24 +1,23 @@
 import React, { useRef, useEffect, useState, useContext } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Check, AlertTriangle, FileText, Loader2 } from 'lucide-react';
+import { Check, AlertTriangle, FileText, Loader2, Minus, Edit3, Search } from 'lucide-react';
 import { useReducedMotion, useParallax } from '../motion';
 import { useDocumentState, DocumentPhase, PHASE_LABELS, PHASE_COLORS } from '../motion';
 
 const EASE = [0.22, 1, 0.36, 1];
 
-const PHASE_CONFIG = {
+const PHASE_CONTENT = {
   [DocumentPhase.RAW]: {
     label: 'RAW INPUT',
     subtitle: 'Unstructured material',
     icon: FileText,
     accent: 'var(--accent)',
-    paperClass: 'paper--raw',
     lines: [
-      'Passport validity: 6+ months',
-      'Financial evidence: bank statements',
-      'Accommodation: confirmed booking',
-      'Cover letter: drafted',
-      'Photographs: spec format',
+      { text: 'Passport validity: 6+ months', status: 'pending', issue: false },
+      { text: 'Financial evidence: bank statements', status: 'pending', issue: true, issueText: 'Mixed currency formats (£1,200 vs 1200 GBP)' },
+      { text: 'Accommodation: confirmed booking', status: 'pending', issue: false },
+      { text: 'Cover letter: drafted', status: 'pending', issue: true, issueText: 'Missing formal address block' },
+      { text: 'Photographs: spec format', status: 'pending', issue: false },
     ],
     checks: ['Gaps identified', 'Requirements mapped', 'Missing items flagged'],
   },
@@ -27,12 +26,12 @@ const PHASE_CONFIG = {
     subtitle: 'Organized document set',
     icon: FileText,
     accent: 'var(--green)',
-    paperClass: 'paper--structured',
     lines: [
-      'Application form completed',
-      'Supporting documents ordered',
-      'Evidence indexed & labeled',
-      'Narrative flow established',
+      { text: 'Application form completed', status: 'done', issue: false },
+      { text: 'Supporting documents ordered', status: 'done', issue: false },
+      { text: 'Evidence indexed & labeled', status: 'done', issue: false },
+      { text: 'Currency standardized to GBP 1,200.00', status: 'done', issue: false },
+      { text: 'Narrative flow established', status: 'done', issue: false },
     ],
     checks: ['Hierarchy consistent', 'Cross-references valid', 'Format standardized'],
   },
@@ -41,12 +40,12 @@ const PHASE_CONFIG = {
     subtitle: 'Expert verification',
     icon: AlertTriangle,
     accent: 'var(--warning)',
-    paperClass: 'paper--reviewed',
     lines: [
-      'Requirement compliance checked',
-      'Clarity & tone reviewed',
-      'Edge cases flagged',
-      'Corrections annotated',
+      { text: 'Requirement compliance checked', status: 'done', issue: false },
+      { text: 'Clarity & tone reviewed', status: 'done', issue: false },
+      { text: 'Edge cases flagged', status: 'review', issue: true, issueText: 'Cover letter tone lacks formal address' },
+      { text: 'Corrections annotated', status: 'done', issue: false },
+      { text: 'Final consistency pass', status: 'pending', issue: false },
     ],
     checks: ['Accuracy verified', 'Judgment applied', 'Resolution noted'],
   },
@@ -55,28 +54,80 @@ const PHASE_CONFIG = {
     subtitle: 'Submission ready',
     icon: Check,
     accent: 'var(--green)',
-    paperClass: 'paper--verified',
     lines: [
-      'Final consistency pass',
-      'All flags resolved',
-      'Output generated',
-      'Delivery confirmed',
+      { text: 'Final consistency pass', status: 'done', issue: false },
+      { text: 'All flags resolved', status: 'done', issue: false },
+      { text: 'Output generated', status: 'done', issue: false },
+      { text: 'Delivery confirmed', status: 'done', issue: false },
     ],
     checks: ['Complete', 'Accurate', 'Ready for use'],
   },
 };
 
-function PaperSheet({ phase, isActive, isExiting, index, reduced }) {
-  const config = PHASE_CONFIG[phase];
+const TRANSITION_REDLINES = {
+  [DocumentPhase.RAW]: [
+    { text: 'Mixed currency formats (£1,200 vs 1200 GBP)', severity: 'high' },
+    { text: 'Missing formal address block', severity: 'medium' },
+  ],
+  [DocumentPhase.STRUCTURED]: [
+    { text: 'Cover letter tone lacks formal address', severity: 'medium' },
+  ],
+  [DocumentPhase.REVIEWED]: [],
+};
+
+function StatusIcon({ status, accent, reduced }) {
+  const configs = {
+    done: { icon: Check, color: 'var(--green)' },
+    pending: { icon: Loader2, color: 'var(--text-muted)' },
+    review: { icon: AlertTriangle, color: 'var(--warning)' },
+  };
+  const config = configs[status] || configs.pending;
+  const Icon = config.icon;
+  return (
+    <motion.span
+      initial={reduced ? false : { opacity: 0, scale: 0.5 }}
+      animate={{ opacity: 1, scale: 1 }}
+      transition={{ type: 'spring', stiffness: 400, damping: 15, delay: reduced ? 0 : 0.2 }}
+      style={{ color: config.color }}
+    >
+      <Icon size={10} />
+    </motion.span>
+  );
+}
+
+function RedlineMark({ text, severity, reduced, delay = 0 }) {
+  const colors = {
+    high: { bg: 'rgba(239,68,68,0.08)', border: 'rgba(239,68,68,0.2)', dot: '#ef4444' },
+    medium: { bg: 'rgba(245,158,11,0.08)', border: 'rgba(245,158,11,0.2)', dot: '#f59e0b' },
+  };
+  const c = colors[severity] || colors.medium;
+
+  return (
+    <motion.div
+      initial={reduced ? false : { opacity: 0, y: 10, x: -20 }}
+      animate={{ opacity: 1, y: 0, x: 0 }}
+      transition={{ duration: reduced ? 0.01 : 0.4, delay: reduced ? 0 : delay, ease: [0.22, 1, 0.36, 1] }}
+      className="redline-inline"
+      style={{ '--redline-color': c.dot }}
+    >
+      <span className="redline-inline__dot" style={{ background: c.dot }} />
+      <span className="redline-inline__text">{text}</span>
+    </motion.div>
+  );
+}
+
+function PaperSheet({ phase, isActive, isExiting, index, reduced, showRedlines }) {
+  const config = PHASE_CONTENT[phase];
   const Icon = config.icon;
   const zIndex = 10 - index;
+  const transitionRedlines = TRANSITION_REDLINES[phase] || [];
 
   const initial = reduced ? false : { opacity: 0, y: 40, scale: 0.95, rotateX: -5 };
   const animate = isActive
     ? { opacity: 1, y: 0, scale: 1, rotateX: 0 }
     : isExiting
       ? { opacity: 0, y: -40, scale: 0.95, rotateX: 5 }
-      : { opacity: 0.3, y: index * 8, scale: 0.98 - index * 0.01, rotateX: -3 };
+      : { opacity: 0.25, y: index * 6, scale: 0.98 - index * 0.01, rotateX: -3 };
 
   return (
     <AnimatePresence mode="wait">
@@ -107,17 +158,41 @@ function PaperSheet({ phase, isActive, isExiting, index, reduced }) {
           <div className="paper__lines">
             {config.lines.map((line, i) => (
               <motion.div
-                key={line}
-                className="paper__line"
+                key={line.text}
+                className={`paper__line paper__line--${line.status}`}
                 initial={reduced ? false : { opacity: 0, x: -20 }}
-                animate={isActive ? { opacity: 1, x: 0 } : { opacity: 0.4, x: 0 }}
-                transition={{ duration: reduced ? 0.01 : 0.4, delay: reduced ? 0 : isActive ? 0.2 + i * 0.06 : 0, ease: EASE }}
+                animate={isActive ? { opacity: 1, x: 0 } : { opacity: 0.35, x: 0 }}
+                transition={{ duration: reduced ? 0.01 : 0.35, delay: reduced ? 0 : isActive ? 0.15 + i * 0.05 : 0, ease: EASE }}
               >
-                <span className="paper__bullet" />
-                <span>{line}</span>
+                <StatusIcon status={line.status} accent={config.accent} reduced={reduced} />
+                <span className="paper__line-text">{line.text}</span>
+                {line.issue && line.issueText && (
+                  <motion.span
+                    className="paper__issue-badge"
+                    initial={reduced ? false : { opacity: 0, scale: 0.5 }}
+                    animate={isActive ? { opacity: 1, scale: 1 } : { opacity: 0, scale: 0 }}
+                    transition={{ duration: reduced ? 0.01 : 0.3, delay: reduced ? 0 : 0.3 + i * 0.08, ease: EASE }}
+                  >
+                    <Edit3 size={9} /> {line.issueText}
+                  </motion.span>
+                )}
               </motion.div>
             ))}
           </div>
+
+          {showRedlines && isActive && transitionRedlines.length > 0 && (
+            <motion.div
+              className="paper__redlines"
+              initial={reduced ? false : { opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              transition={{ duration: reduced ? 0.01 : 0.5, delay: reduced ? 0 : 0.4, ease: EASE }}
+            >
+              <span className="paper__redlines-label">Flagged for review:</span>
+              {transitionRedlines.map((r, i) => (
+                <RedlineMark key={r.text} text={r.text} severity={r.severity} reduced={reduced} delay={0.5 + i * 0.15} />
+              ))}
+            </motion.div>
+          )}
         </div>
 
         <div className="paper__footer">
@@ -127,8 +202,8 @@ function PaperSheet({ phase, isActive, isExiting, index, reduced }) {
                 key={check}
                 className="paper__check"
                 initial={reduced ? false : { opacity: 0, scale: 0.8 }}
-                animate={isActive ? { opacity: 1, scale: 1 } : { opacity: 0.3, scale: 0.9 }}
-                transition={{ type: 'spring', stiffness: 400, damping: 15, delay: reduced ? 0 : isActive ? 0.4 + i * 0.08 : 0 }}
+                animate={isActive ? { opacity: 1, scale: 1 } : { opacity: 0.2, scale: 0.9 }}
+                transition={{ type: 'spring', stiffness: 400, damping: 15, delay: reduced ? 0 : isActive ? 0.35 + i * 0.07 : 0 }}
               >
                 <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
                   <motion.path
@@ -162,7 +237,7 @@ function PaperSheet({ phase, isActive, isExiting, index, reduced }) {
 }
 
 function StatusBadge({ phase }) {
-  const config = PHASE_CONFIG[phase];
+  const config = PHASE_CONTENT[phase];
   return (
     <span className="status-badge" style={{ '--badge-color': config.accent }}>
       {config.label}
@@ -176,7 +251,7 @@ function PhaseNavigator({ currentPhase, onPhaseClick, reduced }) {
   return (
     <div className="phase-navigator" role="tablist" aria-label="Document phases">
       {phases.map((phase, i) => {
-        const config = PHASE_CONFIG[phase];
+        const config = PHASE_CONTENT[phase];
         const isCurrent = phase === currentPhase;
         const isPast = phases.indexOf(currentPhase) > i;
         return (
@@ -206,7 +281,7 @@ function PhaseNavigator({ currentPhase, onPhaseClick, reduced }) {
   );
 }
 
-export default function DocumentProtagonist({ autoCycle = true, cycleInterval = 6000 }) {
+export default function DocumentProtagonist({ autoCycle = true, cycleInterval = 8000, showRedlines = true }) {
   const containerRef = useRef(null);
   const reduced = useReducedMotion();
   const { style: parallaxStyle } = useParallax({ containerRef });
@@ -233,7 +308,7 @@ export default function DocumentProtagonist({ autoCycle = true, cycleInterval = 
   return (
     <div className="document-protagonist-wrapper" ref={containerRef}>
       {!reduced && (
-        <div className="protagonist-glow" style={{ background: `radial-gradient(circle, ${PHASE_COLORS[currentPhase]}20, transparent 70%)` }} />
+        <div className="protagonist-glow" style={{ background: `radial-gradient(circle, ${PHASE_COLORS[currentPhase]}15, transparent 70%)` }} />
       )}
 
       <div className="document-protagonist" style={{ ...parallaxStyle, transformPerspective: 1000 }}>
@@ -246,6 +321,7 @@ export default function DocumentProtagonist({ autoCycle = true, cycleInterval = 
               isExiting={isTransitioning && phases.indexOf(currentPhase) > i}
               index={i}
               reduced={reduced}
+              showRedlines={showRedlines}
             />
           ))}
         </AnimatePresence>

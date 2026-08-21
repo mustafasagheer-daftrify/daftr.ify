@@ -37,12 +37,11 @@ export default function Hero() {
       <div className="hero__bg">
         <img src="/images/hero-bg.jpg" alt="" loading="eager" />
       </div>
-      <div className="hero__atmosphere">
+      <div className="hero__atmosphere" aria-hidden="true">
         <div className="hero__orb hero__orb--1" />
         <div className="hero__orb hero__orb--2" />
         <div className="hero__orb hero__orb--3" />
       </div>
-      <div className="hero__grid" />
 
       <div className="hero__canvas">
         <motion.div
