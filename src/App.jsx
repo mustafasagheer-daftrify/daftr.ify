@@ -22,33 +22,36 @@ import LivingDocument from './LivingDocument';
 import LeadForm from './LeadForm';
 import Founder from './Founder';
 import Privacy from './Privacy';
+import { DocumentStateProvider } from './motion';
 
 export { ScrollReveal, Section, SectionHead, MagneticButton, CapMockup, WorkMockup };
 
 export default function App() {
   return (
-    <div className="app">
-      <Nav />
-      <main>
-        <Hero />
-        <ScrollReveal stagger={0}><Marquee /></ScrollReveal>
-        <Capabilities />
-        <Transformation />
-        <HumanReview />
-        <Work />
-        <WorkShowcase />
-        <ResourcesRail />
-        <Process />
-        <DecisionLayer />
-        <About />
-        <Founder />
-        <FAQ />
-        <RequestPanel />
-        <FinalCTA />
-        <LeadForm />
-      </main>
-      <Privacy />
-      <Footer />
-    </div>
+    <DocumentStateProvider>
+      <div className="app">
+        <Nav />
+        <main>
+          <Hero />
+          <ScrollReveal stagger={0}><Marquee /></ScrollReveal>
+          <Capabilities />
+          <Transformation />
+          <HumanReview />
+          <Work />
+          <WorkShowcase />
+          <ResourcesRail />
+          <Process />
+          <DecisionLayer />
+          <About />
+          <Founder />
+          <FAQ />
+          <RequestPanel />
+          <FinalCTA />
+          <LeadForm />
+        </main>
+        <Privacy />
+        <Footer />
+      </div>
+    </DocumentStateProvider>
   );
 }

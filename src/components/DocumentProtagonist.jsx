@@ -1,8 +1,8 @@
-import React, { useRef, useEffect, useState } from 'react';
+import React, { useRef, useEffect, useState, useContext } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Check, AlertTriangle, FileText, Loader2 } from 'lucide-react';
 import { useReducedMotion, useParallax } from '../motion';
-import { documentState, DocumentPhase, PHASE_LABELS, PHASE_COLORS } from '../motion/documentState';
+import { useDocumentState, DocumentPhase, PHASE_LABELS, PHASE_COLORS } from '../motion';
 
 const EASE = [0.22, 1, 0.36, 1];
 
@@ -186,6 +186,10 @@ function PhaseNavigator({ currentPhase, onPhaseClick, reduced }) {
             aria-selected={isCurrent}
             aria-label={config.label}
             onClick={() => onPhaseClick?.(phase)}
+            onKeyDown={(e) => {
+              if (e.key === 'ArrowRight') onPhaseClick?.(phases[Math.min(i + 1, phases.length - 1)]);
+              if (e.key === 'ArrowLeft') onPhaseClick?.(phases[Math.max(i - 1, 0)]);
+            }}
             className={`phase-nav-step ${isCurrent ? 'current' : ''} ${isPast ? 'past' : ''}`}
             initial={reduced ? false : { opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
@@ -202,41 +206,27 @@ function PhaseNavigator({ currentPhase, onPhaseClick, reduced }) {
   );
 }
 
-export default function DocumentProtagonist({ autoCycle = true, cycleInterval = 6000, controlledPhase, onPhaseChange }) {
+export default function DocumentProtagonist({ autoCycle = true, cycleInterval = 6000 }) {
   const containerRef = useRef(null);
   const reduced = useReducedMotion();
   const { style: parallaxStyle } = useParallax({ containerRef });
+  const { phase, isTransitioning, nextPhase, PHASE_ORDER, PHASE_LABELS, PHASE_COLORS } = useDocumentState();
 
-  const [currentPhase, setCurrentPhase] = useState(controlledPhase || DocumentPhase.RAW);
-  const [isTransitioning, setIsTransitioning] = useState(false);
-
-  useEffect(() => {
-    if (controlledPhase !== undefined) {
-      setCurrentPhase(controlledPhase);
-    }
-  }, [controlledPhase]);
+  const [currentPhase, setCurrentPhase] = useState(phase);
 
   useEffect(() => {
-    if (!autoCycle || controlledPhase !== undefined) return;
-    if (reduced) return;
+    setCurrentPhase(phase);
+  }, [phase]);
+
+  useEffect(() => {
+    if (!autoCycle || reduced) return;
 
     const interval = setInterval(() => {
-      setIsTransitioning(true);
-      setCurrentPhase(prev => {
-        const phases = Object.values(DocumentPhase);
-        const idx = phases.indexOf(prev);
-        const next = phases[(idx + 1) % phases.length];
-        return next;
-      });
-      setTimeout(() => setIsTransitioning(false), 800);
+      nextPhase();
     }, cycleInterval);
 
     return () => clearInterval(interval);
-  }, [autoCycle, cycleInterval, controlledPhase, reduced]);
-
-  useEffect(() => {
-    if (onPhaseChange) onPhaseChange(currentPhase);
-  }, [currentPhase, onPhaseChange]);
+  }, [autoCycle, cycleInterval, reduced, nextPhase]);
 
   const phases = Object.values(DocumentPhase);
 

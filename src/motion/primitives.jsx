@@ -97,6 +97,24 @@ export function PhaseIndicator({ phase, phases, onPhaseClick }) {
             aria-selected={isCurrent}
             aria-label={p}
             onClick={() => onPhaseClick?.(p)}
+            onKeyDown={(e) => {
+              if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+                e.preventDefault();
+                onPhaseClick?.(phases[Math.min(i + 1, phases.length - 1)]);
+              }
+              if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+                e.preventDefault();
+                onPhaseClick?.(phases[Math.max(i - 1, 0)]);
+              }
+              if (e.key === 'Home') {
+                e.preventDefault();
+                onPhaseClick?.(phases[0]);
+              }
+              if (e.key === 'End') {
+                e.preventDefault();
+                onPhaseClick?.(phases[phases.length - 1]);
+              }
+            }}
             className={`phase-step ${isCurrent ? 'current' : ''} ${isPast ? 'past' : ''}`}
             initial={reduced ? false : { opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}

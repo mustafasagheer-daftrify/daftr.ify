@@ -1,15 +1,16 @@
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import { motion, useScroll, useTransform } from 'framer-motion';
 import { ArrowDownRight } from 'lucide-react';
 import DocumentProtagonist from '../components/DocumentProtagonist';
 import { MagneticButton } from '../components/MagneticButton';
-import { useScrollScene, useReducedMotion } from '../motion';
+import { useScrollScene, useReducedMotion, useDocumentState } from '../motion';
 
 const EASE = [0.22, 1, 0.36, 1];
 
 export default function Hero() {
   const reduced = useReducedMotion();
   const [isMobile, setIsMobile] = useState(false);
+  const { phase, PHASE_LABELS, PHASE_COLORS } = useDocumentState();
 
   useEffect(() => {
     const checkMobile = () => setIsMobile(window.innerWidth < 768);
@@ -46,7 +47,7 @@ export default function Hero() {
       <div className="hero__canvas">
         <motion.div
           style={{ y, opacity, scale }}
-          className="hero__typography-layer"
+          className="hero__content-layer"
           initial={reduced ? false : { opacity: 0, y: isMobile ? 16 : 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: reduced ? 0.01 : 0.8, ease: EASE }}
@@ -79,8 +80,8 @@ export default function Hero() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: reduced ? 0.01 : 0.8, delay: reduced ? 0 : 0.3, ease: EASE }}
           >
-            Certified language solutions for visas, academics, and business.
-            From Faisalabad to the world.
+            Turn messy work into clear workflows.
+            Structured by process, refined by people.
           </motion.p>
 
           <motion.div
@@ -93,6 +94,17 @@ export default function Hero() {
             <a href="#capabilities" className="link-arrow">
               Explore the studio <ArrowDownRight size={15} />
             </a>
+          </motion.div>
+
+          <motion.div
+            className="hero__state-indicator"
+            initial={reduced ? false : { opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: reduced ? 0.01 : 0.8, delay: reduced ? 0 : 0.5, ease: EASE }}
+            style={{ '--phase-color': PHASE_COLORS[phase] }}
+          >
+            <span className="hero__state-label">Current state</span>
+            <span className="hero__state-value">{PHASE_LABELS[phase]}</span>
           </motion.div>
         </motion.div>
 
