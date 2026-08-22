@@ -208,6 +208,7 @@ export default function HumanReview() {
   const reduced = useReducedMotion();
   const [activeStep, setActiveStep] = useState('flagged');
   const [completedSteps, setCompletedSteps] = useState(new Set());
+  const [isPaused, setIsPaused] = useState(false);
   const { phase } = useDocumentState();
   const { style: parallaxStyle } = useParallax({ containerRef: { current: null } });
 
@@ -230,18 +231,23 @@ export default function HumanReview() {
   };
 
   useEffect(() => {
-    if (reduced) return;
+    if (reduced || isPaused) return;
     const timer = setTimeout(() => {
       if (activeStep !== 'verified' && !completedSteps.has(activeStep)) {
         handleResolve(activeStep);
       }
     }, 10000);
     return () => clearTimeout(timer);
-  }, [activeStep, completedSteps, reduced]);
+  }, [activeStep, completedSteps, reduced, isPaused]);
 
   return (
     <Section ref={ref} id="human-review" className="section--human-review" style={{ transform: y, opacity }}>
-      <div className="review-layout">
+      <div className="review-layout"
+        onMouseEnter={() => setIsPaused(true)}
+        onMouseLeave={() => setIsPaused(false)}
+        onFocusCapture={() => setIsPaused(true)}
+        onBlurCapture={() => setIsPaused(false)}
+      >
         <div className="review-panel" style={{ ...parallaxStyle }}>
           <SectionHead
             kicker="02 / Human in the loop"

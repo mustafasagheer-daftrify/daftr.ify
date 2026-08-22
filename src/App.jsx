@@ -30,8 +30,9 @@ export default function App() {
   return (
     <DocumentStateProvider>
       <div className="app">
+        <a href="#main-content" className="skip-link">Skip to main content</a>
         <Nav />
-        <main>
+        <main id="main-content">
           <Hero />
           <ScrollReveal stagger={0}><Marquee /></ScrollReveal>
           <Capabilities />
